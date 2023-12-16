@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat App</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #36393f; color: white; }
+        #chat { background-color: #40444b; height: 400px; overflow-y: scroll; padding: 10px; }
+        .message { margin-bottom: 10px; padding: 8px; background-color: #2f3136; border-radius: 8px; }
+        .message img { max-width: 100%; border-radius: 8px; }
+        .message-text { word-break: break-word; }
+        .message-input { background-color: #40444b; padding: 10px; }
+        .status { color: #b9bbbe; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 class="text-center mt-4">Chat App</h2>
+        <div id="status" class="text-center status mb-2">Connecting...</div>
+        <div id="chat" class="rounded mb-3"></div>
+        <div class="message-input rounded">
+            <input type="text" id="message" class="form-control mb-3" placeholder="Enter message">
+            <input type="file" id="imageInput" class="form-control mb-3">
+            <button id="send" class="btn btn-primary">Send</button>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+
+    <script>
+        let userName = prompt("Please enter your name:", "Guest");
+if (!userName) userName = "Guest";
+// Append a random number to the username
+userName += Math.floor(Math.random() * 1000);
+        const ws = new WebSocket('ws://54.238.79.41:8001');
+        const chat = document.getElementById('chat');
+        const status = document.getElementById('status');
+        const messageInput = document.getElementById('message');
+        const imageInput = document.getElementById('imageInput');
+        const sendButton = document.getElementById('send');
+
+        ws.onopen = function() {
+            status.textContent = 'Connected';
+            status.style.color = 'green';
+        };
+
+        ws.onclose = function() {
+            status.textContent = 'Disconnected';
+            status.style.color = 'red';
+        };
+
+        ws.onerror = function() {
+            status.textContent = 'Connection Error';
+            status.style.color = 'orange';
+        };
+
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            if (data.type === 'history') {
+                loadChatHistory(data.messages);
+            } else if (data.type === 'text') {
+                addMessage(data.username, data.message);
+            } else if (data.type === 'image') {
+                addImage(data.data);
+            }
+        };
+
+        function loadChatHistory(messages) {
+            chat.innerHTML = '';
+            messages.forEach(msg => {
+                addMessage(msg.username, msg.message);
+            });
+        }
+
+        sendButton.onclick = function() {
+            const message = messageInput.value;
+            if (message) {
+                ws.send(JSON.stringify({ type: 'text', username: userName, message: message }));
+                messageInput.value = '';
+                addMessage('You', message);
+            }
+        };
+
+        imageInput.onchange = function() {
+            const file = this.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    ws.send(JSON.stringify({ type: 'image', username: userName, data: e.target.result }));
+                    addImage(e.target.result);
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+
+        function addMessage(username, message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message');
+            messageDiv.innerHTML = `<strong>${username}</strong>: ${message}`;
+            chat.appendChild(messageDiv);
+            chat.scrollTop = chat.scrollHeight; // Auto-scroll to the latest message
+        }
+
+        function addImage(imageData) {
+            const image = document.createElement('img');
+            image.src = imageData;
+            image.classList.add('message');
+            chat.appendChild(image);
+            chat.scrollTop = chat.scrollHeight; // Auto-scroll to the latest message
+        }
+    </script>
+</body>
+</html>
